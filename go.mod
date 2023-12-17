@@ -3,14 +3,14 @@ module github.com/haimgel/kan-brewer
 go 1.21.5
 
 require (
-	github.com/kanisterio/kanister v0.0.0-20230315064759-3c4b039f51b2
+	github.com/kanisterio/kanister v0.0.0-20231218192504-b084dbcd87a9
 	github.com/urfave/cli/v3 v3.0.0-alpha7
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 )
 
-// Goland refuses to sync dependencies without it
+// Goland refuses to sync dependencies without this line
 replace github.com/graymeta/stow => github.com/kastenhq/stow v0.2.6-kasten.1.0.20231101232131-9321daa23aae
 
 require (
@@ -40,6 +40,7 @@ require (
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
+	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.15.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
@@ -53,7 +54,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.26.1 // indirect
+	k8s.io/apiextensions-apiserver v0.26.10 // indirect
+	k8s.io/code-generator v0.26.11 // indirect
+	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
