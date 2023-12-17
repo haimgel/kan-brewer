@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/haimgel/kan-brewer/internal/config"
+	"github.com/kanisterio/kanister/pkg/apis/cr/v1alpha1"
+	kanisterclient "github.com/kanisterio/kanister/pkg/client/clientset/versioned"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -19,10 +17,10 @@ import (
 )
 
 type Synchronizer struct {
-	Logger        *slog.Logger
-	Client        *kubernetes.Clientset
-	DynamicClient *dynamic.DynamicClient
-	Cfg           config.Config
+	Logger         *slog.Logger
+	Client         *kubernetes.Clientset
+	KanisterClient *kanisterclient.Clientset
+	Cfg            config.Config
 }
 
 func createClientConfig() (*rest.Config, error) {
@@ -58,21 +56,22 @@ func (s *Synchronizer) getPvcs(ctx context.Context, namespaces []apiv1.Namespace
 }
 
 func (s *Synchronizer) createActionSet(ctx context.Context,
-	name string, namespace string, blueprint string, object apiv1.ObjectReference) error {
+	name string, namespace string, blueprint string, object v1alpha1.ObjectReference) error {
 
-	gvr := schema.GroupVersionResource{Group: "cr.kanister.io", Version: "v1alpha1", Resource: "actionsets"}
-	actionSet := &ActionSet{
-		APIVersion: "cr.kanister.io/v1alpha1",
-		Kind:       "ActionSet",
-		Metadata: metav1.ObjectMeta{
+	actionSet := &v1alpha1.ActionSet{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "cr.kanister.io/v1alpha1",
+			Kind:       "ActionSet",
+		},
+		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name + "-",
 			Namespace:    namespace,
 			Labels: map[string]string{
 				config.ManagedByLabel: config.AppId,
 			},
 		},
-		Spec: ActionSetSpec{
-			Actions: []Action{
+		Spec: &v1alpha1.ActionSetSpec{
+			Actions: []v1alpha1.ActionSpec{
 				{
 					Name:      "backup",
 					Blueprint: blueprint,
@@ -81,13 +80,8 @@ func (s *Synchronizer) createActionSet(ctx context.Context,
 			},
 		},
 	}
-	actionSetMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&actionSet)
-	if err != nil {
-		return err
-	}
-	customResource := &unstructured.Unstructured{Object: actionSetMap}
 	s.Logger.Info("Creating ActionSet", "name", name, "namespace", namespace, "blueprint", blueprint, "object", object)
-	resource, err := s.DynamicClient.Resource(gvr).Namespace(actionSet.Metadata.Namespace).Create(ctx, customResource, metav1.CreateOptions{})
+	resource, err := s.KanisterClient.CrV1alpha1().ActionSets(namespace).Create(ctx, actionSet, metav1.CreateOptions{})
 	s.Logger.Info("ActionSet created", "name", resource.GetName(), "namespace", resource.GetNamespace())
 	return err
 }
@@ -101,7 +95,7 @@ func (s *Synchronizer) scheduleBackupsForNamespace(ctx context.Context, namespac
 
 	for _, blueprint := range blueprints {
 		name := fmt.Sprintf("auto-%s-%s", blueprint, namespace.Name)
-		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, apiv1.ObjectReference{
+		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, v1alpha1.ObjectReference{
 			Kind: "Namespace",
 			Name: namespace.Name,
 		})
@@ -121,7 +115,7 @@ func (s *Synchronizer) scheduleBackupsForPvc(ctx context.Context, pvc apiv1.Pers
 
 	for _, blueprint := range blueprints {
 		name := fmt.Sprintf("auto-%s-%s-%s", blueprint, pvc.Namespace, pvc.Name)
-		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, apiv1.ObjectReference{
+		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, v1alpha1.ObjectReference{
 			Kind:      "Pvc",
 			Name:      pvc.Name,
 			Namespace: pvc.Namespace,
@@ -134,8 +128,7 @@ func (s *Synchronizer) scheduleBackupsForPvc(ctx context.Context, pvc apiv1.Pers
 }
 
 func (s *Synchronizer) cleanupActionSets(ctx context.Context) error {
-	gvr := schema.GroupVersionResource{Group: "cr.kanister.io", Version: "v1alpha1", Resource: "actionsets"}
-	namespace := s.DynamicClient.Resource(gvr).Namespace(s.Cfg.ActionSetNamespace)
+	namespace := s.KanisterClient.CrV1alpha1().ActionSets(s.Cfg.ActionSetNamespace)
 	actionSets, err := namespace.List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", config.ManagedByLabel, config.AppId),
 	})
@@ -143,7 +136,7 @@ func (s *Synchronizer) cleanupActionSets(ctx context.Context) error {
 		return err
 	}
 	// Group by GenerateName
-	groups := make(map[string][]unstructured.Unstructured)
+	groups := make(map[string][]*v1alpha1.ActionSet)
 	for _, item := range actionSets.Items {
 		generateName := item.GetGenerateName()
 		groups[generateName] = append(groups[generateName], item)
@@ -158,8 +151,7 @@ func (s *Synchronizer) cleanupActionSets(ctx context.Context) error {
 		})
 
 		for i, actionSet := range group {
-			state, _, _ := unstructured.NestedString(actionSet.Object, "status", "state")
-			if int64(i) < int64(len(group))-s.Cfg.KeepCompletedActionSets && state == "complete" {
+			if int64(i) < int64(len(group))-s.Cfg.KeepCompletedActionSets && actionSet.Status.State == v1alpha1.StateComplete {
 				err := namespace.Delete(ctx, actionSet.GetName(), metav1.DeleteOptions{})
 				if err == nil {
 					s.Logger.Info("ActionSet deleted", "name", actionSet.GetName(),
@@ -226,14 +218,14 @@ func NewSynchronizer(cfg config.Config, logger *slog.Logger) (*Synchronizer, err
 	if err != nil {
 		return nil, err
 	}
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	kanisterClient, err := kanisterclient.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 	return &Synchronizer{
-		Logger:        logger,
-		Client:        client,
-		DynamicClient: dynamicClient,
-		Cfg:           cfg,
+		Logger:         logger,
+		Client:         client,
+		KanisterClient: kanisterClient,
+		Cfg:            cfg,
 	}, nil
 }
