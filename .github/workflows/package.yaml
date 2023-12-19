@@ -65,15 +65,15 @@ jobs:
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
           sbom: ${{ github.event_name != 'pull_request' }}
 
-      - uses: sigstore/cosign-installer@v3
-
-      - name: Sign the images with GitHub OIDC Token
-        env:
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-          TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          images=""
-          for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
-          done
-          cosign sign --yes ${images}
+#      - uses: sigstore/cosign-installer@v3
+#
+#      - name: Sign the images with GitHub OIDC Token
+#        env:
+#          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+#          TAGS: ${{ steps.meta.outputs.tags }}
+#        run: |
+#          images=""
+#          for tag in ${TAGS}; do
+#            images+="${tag}@${DIGEST} "
+#          done
+#          cosign sign --yes ${images}
