@@ -39,6 +39,8 @@ jobs:
             org.opencontainers.image.description="Kan-brewer is a backup scheduler for Kanister"
             org.opencontainers.image.source=https://github.com/haimgel/kan-brewer
             org.opencontainers.image.licenses=Apache-2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - uses: docker/login-action@v3
         with:
@@ -55,7 +57,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
-          build-args: |
-            DOCKER_METADATA_OUTPUT_JSON
