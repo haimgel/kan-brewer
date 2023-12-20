@@ -18,6 +18,7 @@ jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write # # To be able to get OIDC ID token to sign images.
       contents: read
       packages: write
 
@@ -49,6 +50,8 @@ jobs:
         if: github.event_name != 'pull_request'
 
       - uses: docker/setup-buildx-action@v3
+        with:
+          version: latest # Need at least 0.12.0 for annotations
 
       - id: build-and-push
         uses: docker/build-push-action@v5
@@ -65,15 +68,15 @@ jobs:
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
           sbom: ${{ github.event_name != 'pull_request' }}
 
-#      - uses: sigstore/cosign-installer@v3
-#
-#      - name: Sign the images with GitHub OIDC Token
-#        env:
-#          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-#          TAGS: ${{ steps.meta.outputs.tags }}
-#        run: |
-#          images=""
-#          for tag in ${TAGS}; do
-#            images+="${tag}@${DIGEST} "
-#          done
-#          cosign sign --yes ${images}
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign the published container image
+        if: ${{ github.event_name != 'pull_request' }}
+        env:
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          echo "${TAGS}" | xargs -I {} cosign sign --yes --recursive {}@${DIGEST} \
+            -a sha=${{ github.sha }} \
+            -a run_id=${{ github.run_id }} \
+            -a run_attempt=${{ github.run_attempt }}
