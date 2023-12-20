@@ -1,0 +1,54 @@
+# Default values for kan-brewer.
+
+# Kanister namespace: this is where blueprints are, and this is where the actionsets will be created
+kanisterNamespace: "kanister"
+
+# How many successful actionsets to keep (older successful actionsets will be deleted)
+keepSuccessfulActionsets: 3
+
+image:
+  repository: ghcr.io/haimgel/kan-brewer
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccountAnnotations: {}
+jobAnnotations: {}
+jobLabels: {}
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+   capabilities:
+     drop: [ALL]
+   readOnlyRootFilesystem: true
+   runAsNonRoot: true
+
+cronJob:
+  schedule: "30 1 */1 * *" # 1:30 AM every day
+  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 3
+  backoffLimit: 0
+  restartPolicy: Never
+  ttlSecondsAfterFinished: 86400 # 1 day
+
+resources: {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

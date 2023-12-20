@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "kan-brewer.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "kan-brewer.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  failedJobsHistoryLimit: {{ .Values.cronJob.failedJobsHistoryLimit }}
+  successfulJobsHistoryLimit: {{ .Values.cronJob.successfulJobsHistoryLimit }}
+  schedule: "{{ .Values.cronJob.schedule }}"
+  jobTemplate:
+    metadata:
+      {{- with .Values.jobAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "kan-brewer.labels" . | nindent 8 }}
+	{{- with .Values.jobLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      backoffLimit: {{ .Values.cronJob.backoffLimit }}
+      ttlSecondsAfterFinished: {{ .Values.cronJob.ttlSecondsAfterFinished }}
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "kan-brewer.labels" . | nindent 12 }}
+        {{- with .Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        spec:
+          restartPolicy: {{ .Values.cronJob.restartPolicy }}
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          serviceAccountName: {{ include "kan-brewer.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: {{ .Chart.Name }}
+              command:
+                - /kan-brewer
+                - --namespace
+                - {{ .Values.kanisterNamespace }}
+                - --keep-successful
+                - {{ .Values.keepSuccessfulActionsets | quote }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

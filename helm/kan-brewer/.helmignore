@@ -1,0 +1,8 @@
+# Patterns to ignore when building packages.
+.DS_Store
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
