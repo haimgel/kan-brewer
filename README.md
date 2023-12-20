@@ -9,7 +9,9 @@ apply to either whole namespace (e.g. `kanister-mysql-blueprint`) or to a specif
 
 ## How to 
 
-1. Annotate the namespaces and PVCs that you want to back up with the `kan-brewer.haim.dev/kanister-blueprints` annotation.
+### Annotate the Namespaces and PVCs
+
+Annotate the namespaces and PVCs that you want to back up with the `kan-brewer.haim.dev/kanister-blueprints` annotation.
 It should list all the blueprints that you want to use on that namespace or PVC.
 
 ```yaml
@@ -18,17 +20,26 @@ kind: Namespace
 metadata:
   name: my-namespace
   annotations:
-    kan-brewer.haim.dev/kanister-blueprints: backup-pbs-postgresql,backup-pbs-mongodb,backup-pbs-mariadb
+    kan-brewer.haim.dev/kanister-blueprints: backup-pbs-postgresql,backup-pbs-mongodb
 ```
 
-2. Set up a CronJob to run `kan-brewer` container periodically. The CronJob should use a service account that has
-permissions to list namespaces and PVCs, and to create and delete Kanister action sets.
+### Install the Helm chart
+
+```bash
+  helm install --namespace kanister kan-brewer \
+    oci://ghcr.io/haimgel/helm-charts/kan-brewer --version 0.1.1 \
+    --set cronJob.schedule="45 4 */1 * *" # Run backups every day at 4:45am
+```
+You can view all configuration values with:
+```bash
+  helm show values oci://ghcr.io/haimgel/helm-charts/kan-brewer
+```
 
 ## What will it do?
 
 ### Creates new action sets
 
-`kan-brewer` will create actionsets that reference the blueprints you specified in the annotation, 
+`kan-brewer` cron job will create actionsets that reference the blueprints you specified in the annotation, 
 and the PVC or Namespace object itself. For example:
 
 ```yaml
@@ -54,7 +65,3 @@ spec:
 * Successful action sets only (i.e. those that have `state: complete`).
 * It will keep 3 latest ones (configurable).
 
-## TODO
-
-* [ ] Add support for Kanister profiles and options
-* [ ] Create a Helm chart that will install `kan-brewer` and set up a CronJob
