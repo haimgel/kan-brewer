@@ -47,7 +47,6 @@ jobs:
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
-        if: github.event_name != 'pull_request'
 
       - uses: docker/setup-buildx-action@v3
         with:
@@ -61,14 +60,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ github.event_name != 'pull_request' && steps.meta.outputs.annotations || '' }}
-          load: ${{ github.event_name == 'pull_request' }}
           push: ${{ github.event_name != 'pull_request' }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
           provenance: ${{ github.event_name != 'pull_request' && 'mode=max' || 'false' }}
           sbom: ${{ github.event_name != 'pull_request' }}
 
       - uses: sigstore/cosign-installer@v3
+        if: ${{ github.event_name != 'pull_request' }}
 
       - name: Sign the published container image
         if: ${{ github.event_name != 'pull_request' }}
