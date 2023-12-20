@@ -75,7 +75,7 @@ jobs:
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          echo "${TAGS}" | xargs -I {} cosign sign --yes --recursive {}@${DIGEST} \
+          echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST} \
             -a sha=${{ github.sha }} \
             -a run_id=${{ github.run_id }} \
             -a run_attempt=${{ github.run_attempt }}
