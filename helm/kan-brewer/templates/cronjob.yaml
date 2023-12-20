@@ -41,7 +41,7 @@ spec:
           imagePullSecrets:
             {{- toYaml . | nindent 8 }}
           {{- end }}
-          serviceAccountName: {{ include "kan-brewer.serviceAccountName" . }}
+          serviceAccountName: {{ include "kan-brewer.fullname" . }}
           securityContext:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
           containers:
