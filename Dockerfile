@@ -29,6 +29,7 @@ RUN echo "Running on $BUILDPLATFORM, building for $TARGETPLATFORM" && \
 # Run stage (target architecture)
 FROM scratch
 COPY --from=builder /app/kan-brewer /kan-brewer
+USER 65532
 CMD ["/kan-brewer"]
 
 LABEL org.opencontainers.image.title=Kan-brewer
