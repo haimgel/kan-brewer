@@ -1,5 +1,11 @@
 # Default values for kan-brewer.
 
+# Kanister namespace: this is where blueprints are, and this is where the actionsets will be created
+kanisterNamespace: "kanister"
+
+# How many successful actionsets to keep (older successful actionsets will be deleted)
+keepSuccessfulActionsets: 3
+
 image:
   repository: ghcr.io/haimgel/kan-brewer
   pullPolicy: IfNotPresent

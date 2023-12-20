@@ -46,6 +46,12 @@ spec:
             {{- toYaml .Values.podSecurityContext | nindent 12 }}
           containers:
             - name: {{ .Chart.Name }}
+              command:
+                - /kan-brewer
+                - --namespace
+                - {{ .Values.kanisterNamespace }}
+                - --keep-successful
+                - {{ .Values.keepSuccessfulActionsets | quote }}
               securityContext:
                 {{- toYaml .Values.securityContext | nindent 16 }}
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
