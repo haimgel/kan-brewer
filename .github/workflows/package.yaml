@@ -97,4 +97,4 @@ jobs:
           helm lint helm/kan-brewer
           helm package helm/kan-brewer --version ${{ env.DOCKER_METADATA_OUTPUT_VERSION }} --app-version ${{ env.DOCKER_METADATA_OUTPUT_VERSION }}
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ${{ env.REGISTRY }} --username ${{ github.repository_owner }} --password-stdin
-          helm push --debug kan-brewer-${{ env.DOCKER_METADATA_OUTPUT_VERSION }}.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
+          helm push kan-brewer-${{ env.DOCKER_METADATA_OUTPUT_VERSION }}.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
