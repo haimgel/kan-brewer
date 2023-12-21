@@ -2,5 +2,5 @@ apiVersion: v2
 name: kan-brewer
 description: Backup scheduler for Kanister application-level data management
 type: application
-version: "0.1.1"
-appVersion: "0.1.1"
+version: "0.0.0" # Use --version flag to set this
+appVersion: "0.0.0" # Use --app-version flag to set this

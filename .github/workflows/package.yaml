@@ -13,6 +13,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  HELM_REPO: haimgel/helm-charts
 
 jobs:
   build-and-push-image:
@@ -79,3 +80,23 @@ jobs:
             -a sha=${{ github.sha }} \
             -a run_id=${{ github.run_id }} \
             -a run_attempt=${{ github.run_attempt }}
+
+      - uses: azure/setup-helm@v3
+        with:
+          version: v3.12.2
+
+      - name: Test Helm chart
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        run: |
+          helm lint helm/kan-brewer
+          helm package helm/kan-brewer --version 0.99.99 --app-version 0.99.99
+
+      - name: Release Helm chart
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          VERSION: ${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}.${{ steps.meta.outputs.patch }}
+        run: |
+          helm lint helm/kan-brewer
+          helm package helm/kan-brewer --version $VERSION --app-version $VERSION
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ${{ env.REGISTRY }} --username ${{ github.repository_owner }} --password-stdin
+          helm push --debug kan-brewer-$VERSION.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
