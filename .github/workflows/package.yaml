@@ -85,6 +85,12 @@ jobs:
         with:
           version: v3.12.2
 
+      - name: Test Helm chart
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        run: |
+          helm lint helm/kan-brewer
+          helm package helm/kan-brewer --version 0.99.99 --app-version 0.99.99
+
       - name: Release Helm chart
         if: startsWith(github.ref, 'refs/tags/')
         env:
