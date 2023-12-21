@@ -39,9 +39,9 @@ jobs:
 
       - name: Release helm chart
         env:
-          VERSION: 0.1.1 # ${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}.${{ steps.meta.outputs.patch }}
+          VERSION: 0.1.3 # ${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}.${{ steps.meta.outputs.patch }}
         run: |
           cd helm
           helm package kan-brewer --version $VERSION --app-version $VERSION
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ${{ env.REGISTRY }} --username ${{ github.repository_owner }} --password-stdin
-          helm push --debug kan-brewer-$VERSION.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
+          helm push --debug kan-brewer-$VERSION.tgz oci://${{ env.REGISTRY }}/haimgel # ${{ env.HELM_REPO }}
