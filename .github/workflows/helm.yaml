@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - 'main'
 
 env:
   REGISTRY: ghcr.io
@@ -30,11 +33,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: azure/setup-helm@v3
+        with:
+          version: 3.13.2 # Needed for publishing to OCI repos
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release helm chart
         env:
-          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION: 0.1.1 # ${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}.${{ steps.meta.outputs.patch }}
         run: |
           cd helm
           helm package kan-brewer --version $VERSION --app-version $VERSION
-          helm push kan-brewer-$VERSION.tgz oci://$REGISTRY/$HELM_REPO
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ${{ env.REGISTRY }} --username ${{ github.repository_owner }} --password-stdin
+          helm push --debug kan-brewer-$VERSION.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
