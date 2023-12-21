@@ -11,6 +11,7 @@ env:
 
 jobs:
   release-helm:
+    needs: build-and-push-image
     runs-on: ubuntu-latest
     permissions:
       id-token: write # # To be able to get OIDC ID token to sign images.
@@ -23,18 +24,13 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
 
-      - uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: azure/setup-helm@v3
 
       - name: Release helm chart
         env:
-          VERSION: ${{ steps.meta.outputs.version }}
+          VERSION: ${{ steps.meta.outputs.major }}.${{ steps.meta.outputs.minor }}.${{ steps.meta.outputs.patch }}
         run: |
           cd helm
           helm package kan-brewer --version $VERSION --app-version $VERSION
-          helm push kan-brewer-$VERSION.tgz oci://$REGISTRY/$HELM_REPO
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ${{ env.REGISTRY }} --username ${{ github.repository_owner }} --password-stdin
+          helm push --debug kan-brewer-$VERSION.tgz oci://${{ env.REGISTRY }}/${{ env.HELM_REPO }}
