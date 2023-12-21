@@ -82,6 +82,8 @@ jobs:
             -a run_attempt=${{ github.run_attempt }}
 
       - uses: azure/setup-helm@v3
+        with:
+          version: v3.12.2
 
       - name: Release Helm chart
         if: startsWith(github.ref, 'refs/tags/')
