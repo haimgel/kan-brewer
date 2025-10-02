@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
+	"log/slog"
+	"os"
+
 	"github.com/haimgel/kan-brewer/internal/config"
 	"github.com/haimgel/kan-brewer/internal/sync"
 	"github.com/urfave/cli/v3"
-	"log/slog"
-	"os"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 				Value:       "kanister",
 				Destination: &cfg.ActionSetNamespace,
 			},
-			&cli.IntFlag{
+			&cli.Int64Flag{
 				Name:        "keep-successful",
 				Aliases:     []string{"k"},
 				Usage:       "number of successful previous ActionSets to keep",
