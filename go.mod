@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/kanisterio/kanister v0.113.0-alpha.1
-	github.com/urfave/cli/v3 v3.6.1
+	github.com/urfave/cli/v3 v3.6.2
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
 	k8s.io/client-go v0.35.0
