@@ -46,14 +46,29 @@ Both support in-cluster and local kubeconfig configurations.
 
 ## Development Commands
 
+### Toolchains (mise)
+
+Toolchain versions (Go, golangci-lint) are pinned in `.tool-versions` and managed by [mise](https://mise.jdx.dev/). Run all toolchain commands through mise to ensure the correct versions are installed and used:
+
+```bash
+# Install pinned toolchains
+mise install
+
+# Run any toolchain command
+mise exec -- go build ...
+mise exec -- golangci-lint run ./...
+```
+
+When updating the Go version, keep `.tool-versions`, the `go` directive in `go.mod`, and the builder image in `Dockerfile` in sync (CI builds via Docker, so the Dockerfile is the only place CI picks up the Go version).
+
 ### Building
 
 ```bash
 # Local build
-go build -o kan-brewer cmd/kan-brewer.go
+mise exec -- go build -o kan-brewer cmd/kan-brewer.go
 
 # Build with version info (matches CI pattern)
-go build -ldflags "-s -w -X github.com/haimgel/kan-brewer/internal/config.release=v1.0.0 -X github.com/haimgel/kan-brewer/internal/config.commit=$(git rev-parse --short HEAD) -X github.com/haimgel/kan-brewer/internal/config.date=$(git log -1 --format=%cI)" -o kan-brewer cmd/kan-brewer.go
+mise exec -- go build -ldflags "-s -w -X github.com/haimgel/kan-brewer/internal/config.release=v1.0.0 -X github.com/haimgel/kan-brewer/internal/config.commit=$(git rev-parse --short HEAD) -X github.com/haimgel/kan-brewer/internal/config.date=$(git log -1 --format=%cI)" -o kan-brewer cmd/kan-brewer.go
 
 # Cross-platform builds (using goreleaser config in dist/)
 goreleaser build --snapshot --clean

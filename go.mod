@@ -1,6 +1,6 @@
 module github.com/haimgel/kan-brewer
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/kanisterio/kanister v0.113.0-alpha.1
