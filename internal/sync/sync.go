@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/haimgel/kan-brewer/internal/config"
-	"github.com/kanisterio/kanister/pkg/apis/cr/v1alpha1"
-	kanisterclient "github.com/kanisterio/kanister/pkg/client/clientset/versioned"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -17,10 +18,10 @@ import (
 )
 
 type Synchronizer struct {
-	Logger         *slog.Logger
-	Client         *kubernetes.Clientset
-	KanisterClient *kanisterclient.Clientset
-	Cfg            config.Config
+	Logger        *slog.Logger
+	Client        kubernetes.Interface
+	DynamicClient dynamic.Interface
+	Cfg           config.Config
 }
 
 func createClientConfig() (*rest.Config, error) {
@@ -56,11 +57,11 @@ func (s *Synchronizer) getPvcs(ctx context.Context, namespaces []apiv1.Namespace
 }
 
 func (s *Synchronizer) createActionSet(ctx context.Context,
-	name string, namespace string, blueprint string, object v1alpha1.ObjectReference) error {
+	name string, namespace string, blueprint string, object objectReference) error {
 
-	actionSet := &v1alpha1.ActionSet{
+	obj := &actionSet{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "cr.kanister.io/v1alpha1",
+			APIVersion: actionSetResource.GroupVersion().String(),
 			Kind:       "ActionSet",
 		},
 		ObjectMeta: metav1.ObjectMeta{
@@ -70,8 +71,8 @@ func (s *Synchronizer) createActionSet(ctx context.Context,
 				config.ManagedByLabel: config.AppId,
 			},
 		},
-		Spec: &v1alpha1.ActionSetSpec{
-			Actions: []v1alpha1.ActionSpec{
+		Spec: actionSetSpec{
+			Actions: []actionSpec{
 				{
 					Name:      "backup",
 					Blueprint: blueprint,
@@ -81,9 +82,17 @@ func (s *Synchronizer) createActionSet(ctx context.Context,
 		},
 	}
 	s.Logger.Info("Creating ActionSet", "name", name, "namespace", namespace, "blueprint", blueprint, "object", object)
-	resource, err := s.KanisterClient.CrV1alpha1().ActionSets(namespace).Create(ctx, actionSet, metav1.CreateOptions{})
+	content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return err
+	}
+	resource, err := s.DynamicClient.Resource(actionSetResource).Namespace(namespace).Create(
+		ctx, &unstructured.Unstructured{Object: content}, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
 	s.Logger.Info("ActionSet created", "name", resource.GetName(), "namespace", resource.GetNamespace())
-	return err
+	return nil
 }
 
 func (s *Synchronizer) scheduleBackupsForNamespace(ctx context.Context, namespace apiv1.Namespace) error {
@@ -95,7 +104,7 @@ func (s *Synchronizer) scheduleBackupsForNamespace(ctx context.Context, namespac
 
 	for _, blueprint := range blueprints {
 		name := fmt.Sprintf("auto-%s-%s", blueprint, namespace.Name)
-		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, v1alpha1.ObjectReference{
+		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, objectReference{
 			Kind: "Namespace",
 			Name: namespace.Name,
 		})
@@ -115,7 +124,7 @@ func (s *Synchronizer) scheduleBackupsForPvc(ctx context.Context, pvc apiv1.Pers
 
 	for _, blueprint := range blueprints {
 		name := fmt.Sprintf("auto-%s-%s-%s", blueprint, pvc.Namespace, pvc.Name)
-		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, v1alpha1.ObjectReference{
+		err := s.createActionSet(ctx, name, s.Cfg.ActionSetNamespace, blueprint, objectReference{
 			Kind:      "Pvc",
 			Name:      pvc.Name,
 			Namespace: pvc.Namespace,
@@ -128,16 +137,20 @@ func (s *Synchronizer) scheduleBackupsForPvc(ctx context.Context, pvc apiv1.Pers
 }
 
 func (s *Synchronizer) cleanupActionSets(ctx context.Context) error {
-	namespace := s.KanisterClient.CrV1alpha1().ActionSets(s.Cfg.ActionSetNamespace)
-	actionSets, err := namespace.List(ctx, metav1.ListOptions{
+	actionSets := s.DynamicClient.Resource(actionSetResource).Namespace(s.Cfg.ActionSetNamespace)
+	list, err := actionSets.List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", config.ManagedByLabel, config.AppId),
 	})
 	if err != nil {
 		return err
 	}
 	// Group by GenerateName
-	groups := make(map[string][]*v1alpha1.ActionSet)
-	for _, item := range actionSets.Items {
+	groups := make(map[string][]*actionSet)
+	for _, obj := range list.Items {
+		item := &actionSet{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, item); err != nil {
+			return err
+		}
 		generateName := item.GetGenerateName()
 		groups[generateName] = append(groups[generateName], item)
 	}
@@ -150,15 +163,16 @@ func (s *Synchronizer) cleanupActionSets(ctx context.Context) error {
 			return itime.Before(jtime)
 		})
 
-		for i, actionSet := range group {
-			if int64(i) < int64(len(group))-s.Cfg.KeepCompletedActionSets && actionSet.Status.State == v1alpha1.StateComplete {
-				err := namespace.Delete(ctx, actionSet.GetName(), metav1.DeleteOptions{})
+		for i, item := range group {
+			complete := item.Status != nil && item.Status.State == actionSetStateComplete
+			if int64(i) < int64(len(group))-s.Cfg.KeepCompletedActionSets && complete {
+				err := actionSets.Delete(ctx, item.GetName(), metav1.DeleteOptions{})
 				if err == nil {
-					s.Logger.Info("ActionSet deleted", "name", actionSet.GetName(),
-						"namespace", actionSet.GetNamespace())
+					s.Logger.Info("ActionSet deleted", "name", item.GetName(),
+						"namespace", item.GetNamespace())
 				} else {
-					s.Logger.Error("Error deleting ActionSet", "name", actionSet.GetName(),
-						"namespace", actionSet.GetNamespace(), "error", err)
+					s.Logger.Error("Error deleting ActionSet", "name", item.GetName(),
+						"namespace", item.GetNamespace(), "error", err)
 				}
 			}
 		}
@@ -218,14 +232,14 @@ func NewSynchronizer(cfg config.Config, logger *slog.Logger) (*Synchronizer, err
 	if err != nil {
 		return nil, err
 	}
-	kanisterClient, err := kanisterclient.NewForConfig(clientConfig)
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
 	}
 	return &Synchronizer{
-		Logger:         logger,
-		Client:         client,
-		KanisterClient: kanisterClient,
-		Cfg:            cfg,
+		Logger:        logger,
+		Client:        client,
+		DynamicClient: dynamicClient,
+		Cfg:           cfg,
 	}, nil
 }

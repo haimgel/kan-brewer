@@ -39,10 +39,15 @@ Kan-Brewer is a Kubernetes backup scheduler for Kanister. It creates periodic Ka
 ### Kubernetes Clients
 
 The app uses two Kubernetes clients:
-- Standard `kubernetes.Clientset` for core resources (Namespaces, PVCs)
-- Kanister `kanisterclient.Clientset` for ActionSets (custom resources)
+- Standard `kubernetes.Interface` for core resources (Namespaces, PVCs)
+- client-go's `dynamic.Interface` for ActionSets, with the few fields kan-brewer uses mirrored in `internal/sync/actionset.go`
 
 Both support in-cluster and local kubeconfig configurations.
+
+**Do not import `github.com/kanisterio/kanister`.** govulncheck flags every importer with GO-2024-3080, a module-wide
+advisory about the Kanister operator chart's RBAC that has no fixed version, and the module has no `v`-prefixed tags,
+so Go only sees pseudo-versions that rank below an old `v0.113.0-alpha.1` tag. If a new ActionSet field is needed,
+add it to `actionset.go`.
 
 ## Development Commands
 
@@ -59,7 +64,14 @@ mise exec -- go build ...
 mise exec -- golangci-lint run ./...
 ```
 
-When updating the Go version, keep `.tool-versions`, the `go` directive in `go.mod`, and the builder image in `Dockerfile` in sync (CI builds via Docker, so the Dockerfile is the only place CI picks up the Go version).
+When updating the Go version, keep `.tool-versions`, the `go` directive in `go.mod`, and the builder image in `Dockerfile` in sync (CI builds via Docker, so the Dockerfile is the only place CI picks up the Go version). golangci-lint must support the Go version in use; bump it together with Go.
+
+CI runs neither tests nor a vulnerability scan; run both before tagging:
+
+```bash
+mise exec -- go test -race ./...
+mise exec -- go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+```
 
 ### Building
 
@@ -97,6 +109,10 @@ helm install kan-brewer helm/kan-brewer \
   --set keepSuccessfulActionsets=3
 ```
 
+The chart's defaults must pass PodSecurity `restricted`. To check, dry-run the rendered pod template as a bare Pod
+(`kubectl apply --dry-run=server`) in a namespace labelled `pod-security.kubernetes.io/enforce: restricted`; a CronJob
+there only draws warnings.
+
 ### Running Locally
 
 The app runs once and exits (designed for CronJob):
@@ -113,6 +129,10 @@ GitHub Actions workflow (`.github/workflows/package.yaml`):
 - Publishes Helm charts to GHCR OCI registry
 - Uses Docker buildx with QEMU for cross-compilation
 - Tags: branches, PRs, semver (on tags)
+
+**Releasing:** push a `vX.Y.Z` tag on `main`. CI packages the chart with both `version` and `appVersion` set to
+`X.Y.Z`, so `Chart.yaml` keeps its `0.0.0` placeholders. Bump the minor version when chart values are added or
+renamed.
 
 ## Key Design Patterns
 

@@ -27,7 +27,7 @@ metadata:
 
 ```bash
   helm install --namespace kanister kan-brewer \
-    oci://ghcr.io/haimgel/helm-charts/kan-brewer --version 0.1.1 \
+    oci://ghcr.io/haimgel/helm-charts/kan-brewer --version 0.4.0 \
     --set cronJob.schedule="45 4 */1 * *" # Run backups every day at 4:45am
 ```
 You can view all configuration values with:

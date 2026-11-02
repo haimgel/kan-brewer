@@ -23,6 +23,7 @@ spec:
         {{- end }}
     spec:
       backoffLimit: {{ .Values.cronJob.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.cronJob.activeDeadlineSeconds }}
       ttlSecondsAfterFinished: {{ .Values.cronJob.ttlSecondsAfterFinished }}
       template:
         metadata:
@@ -39,7 +40,7 @@ spec:
           restartPolicy: {{ .Values.cronJob.restartPolicy }}
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
-            {{- toYaml . | nindent 8 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           serviceAccountName: {{ include "kan-brewer.fullname" . }}
           securityContext:
